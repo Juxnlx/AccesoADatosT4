@@ -6,7 +6,7 @@
 		</attributes>
 	</classpathentry>
 	<classpathentry kind="src" path="src"/>
-	<classpathentry kind="lib" path="C:/Users/juanl/Downloads/mysql-connector-j-9.5.0.zip">
+	<classpathentry kind="lib" path="C:/Users/jlbarrionuevo/Downloads/mysql-connector-j-9.5.0.zip">
 		<attributes>
 			<attribute name="module" value="true"/>
 		</attributes>

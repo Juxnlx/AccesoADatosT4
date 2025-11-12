@@ -1,17 +1,19 @@
 package principal;
 
+import java.sql.SQLException;
 import java.util.Scanner;
 
+import crud.RestauranteCRUD;
+
 public class Principal {
+
+	private static final Scanner sc = new Scanner(System.in);
 
 	public static void main(String[] args) {
 
 		// Creamos la variable opc como int para almacenar la opción seleccionada por el
 		// usuario.
 		int opc;
-
-		// Creamos el Scanner para poder leer datos por consola
-		Scanner sc = new Scanner(System.in);
 
 		do {
 			// Llamamos a la función menú.
@@ -20,6 +22,13 @@ public class Principal {
 			// menú y la leemos.
 			System.out.println("Introduce una opción --> ");
 			opc = sc.nextInt();
+			// Limpiamos el buffer
+			sc.nextLine();
+
+			switch (opc) {
+			// Se encarga de la creación de todas las tablas o de alguna especifica.
+			case 1 -> gestionCreacionTablas();
+			}
 
 		} while (opc != 0);
 
@@ -41,4 +50,46 @@ public class Principal {
 		System.out.println("0. Salir");
 	}
 
+	public static void gestionCreacionTablas() {
+		int opc;
+		String nombreTabla = "";
+
+		System.out.println("¿Quieres crear todas las tablas o una tabla concreta?");
+		System.out.println("1. Todas las tablas");
+		System.out.println("2. Tabla concreta");
+		opc = sc.nextInt();
+		sc.nextLine();
+
+		if (opc == 1) {
+			RestauranteCRUD.crearTodasLasTablas();
+		} else if (opc == 2) {
+			System.out.println("Introduce el nombre de la tabla (mesa, producto, factura, pedido):");
+			nombreTabla = sc.nextLine().toLowerCase();
+
+			try {
+				if (RestauranteCRUD.puedeCrearTabla(nombreTabla)) {
+					switch (nombreTabla) {
+					case "mesa" -> RestauranteCRUD.crearTablaMesa();
+					case "producto" -> RestauranteCRUD.crearTablaProducto();
+					case "factura" -> RestauranteCRUD.crearTablaFactura();
+					case "pedido" -> RestauranteCRUD.crearTablaPedido();
+					default -> System.out.println("Tabla no válida.");
+					}
+					System.out.println("Tabla " + nombreTabla + " creada correctamente.");
+				} else {
+					System.out.println("No se puede crear la tabla " + nombreTabla
+							+ " porque depende de otras tablas que no existen.");
+				}
+
+			} catch (SQLException e) {
+				System.out.println("Error al crear la tabla: " + e.getMessage());
+			}
+		} else {
+			System.out.println("Opción no válida");
+		}
+	}
+	
+	public static void gestionInsentarMesa() {
+		
+	}
 }

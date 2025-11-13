@@ -77,8 +77,8 @@ public class RestauranteCRUD {
 		return """
 				CREATE TABLE IF NOT EXISTS Mesa (
 				    idMesa INT AUTO_INCREMENT PRIMARY KEY,
-				    numero INT NOT NULL,
-				    capacidad INT NOT NULL
+				    numComensales INT NOT NULL,
+				    reserva INT NOT NULL
 				);
 				""";
 	}
@@ -134,7 +134,6 @@ public class RestauranteCRUD {
 
 			ResultSet rs = ps.executeQuery();
 			if (rs.next()) {
-				// Asumimos que la columna de ID se llama id + nombre de la tabla
 				String idCol = "id" + tabla;
 				id = rs.getInt(idCol);
 			}
@@ -145,19 +144,16 @@ public class RestauranteCRUD {
 		return id;
 	}
 
-	public static boolean insertarMesa(int numero, int capacidad) throws SQLException {
-		String sql = "INSERT INTO Mesa (numero, capacidad) VALUES (?, ?)";
+	public static boolean insertarMesa(int numComensales, int reserva) {
+		String sql = "INSERT INTO Mesa (numComensales, reserva) VALUES (?, ?)";
 		boolean sol = false;
 
 		try (Connection conn = Conexion.conexionBD(); PreparedStatement ps = conn.prepareStatement(sql)) {
-
-			ps.setInt(1, numero);
-			ps.setInt(2, capacidad);
-
+			ps.setInt(1, numComensales);
+			ps.setInt(2, reserva);
 			ps.executeUpdate();
-
 			sol = true;
-
+			System.out.println("Mesa insertada correctamente");
 		} catch (SQLException e) {
 			System.out.println("Error al insertar mesa: " + e.getMessage());
 		}
@@ -182,26 +178,18 @@ public class RestauranteCRUD {
 		return sol;
 	}
 
-	public static boolean insertarFactura(String tipoPago, double importe) throws SQLException {
-	    int idMesa = obtenerIdPorCampo("Mesa", "numero", numeroMesa);
-
-	    if (idMesa == -1) {
-	        System.out.println("No existe ninguna mesa con ese número.");
-	        return false;
-	    }
-
-	    String sql = "INSERT INTO Factura (fecha, idMesa, tipoPago, importe) VALUES (?, ?, ?, ?)";
+	public static boolean insertarFactura(int idMesa, String tipoPago, double importe) {
+	    String sql = "INSERT INTO Factura (idMesa, tipoPago, importe) VALUES (?, ?, ?)";
 	    boolean sol = false;
 
 	    try (Connection conn = Conexion.conexionBD(); PreparedStatement ps = conn.prepareStatement(sql)) {
-	        ps.setDate(1, Date.valueOf(fecha));
-	        ps.setInt(2, idMesa);
-	        ps.setString(3, tipoPago);
-	        ps.setDouble(4, importe);
+	        ps.setInt(1, idMesa);
+	        ps.setString(2, tipoPago);
+	        ps.setDouble(3, importe);
 
 	        ps.executeUpdate();
 	        sol = true;
-	        System.out.println("Factura insertada");
+	        System.out.println("Factura insertada correctamente");
 	    } catch (SQLException e) {
 	        System.out.println("Error al insertar factura: " + e.getMessage());
 	    }
@@ -227,5 +215,39 @@ public class RestauranteCRUD {
 
 		return sol;
 	}
+	
+	public static ResultSet listar(String tabla, String campo, String operador, String valor) {
+	    ResultSet rs = null;
+	    Connection conn = null;
+
+	    try {
+	        conn = Conexion.conexionBD();
+	        String sql;
+
+	        // Si no hay filtro → mostrar toda la tabla
+	        if (campo == null || campo.isEmpty()) {
+	            sql = "SELECT * FROM " + tabla;
+	            PreparedStatement ps = conn.prepareStatement(sql);
+	            rs = ps.executeQuery();
+	        } else {
+	            sql = "SELECT * FROM " + tabla + " WHERE " + campo + " " + operador + " ?";
+	            PreparedStatement ps = conn.prepareStatement(sql);
+
+	            if (operador.equalsIgnoreCase("LIKE")) {
+	                ps.setString(1, "%" + valor + "%");
+	            } else {
+	                ps.setString(1, valor);
+	            }
+
+	            rs = ps.executeQuery();
+	        }
+
+	    } catch (SQLException e) {
+	        System.out.println("Error al listar datos de " + tabla + ": " + e.getMessage());
+	    }
+
+	    return rs;
+	}
+
 
 }

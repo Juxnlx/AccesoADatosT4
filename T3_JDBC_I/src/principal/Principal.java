@@ -28,6 +28,12 @@ public class Principal {
 			switch (opc) {
 			// Se encarga de la creación de todas las tablas o de alguna especifica.
 			case 1 -> gestionCreacionTablas();
+			case 2 -> gestionInsentarMesa();
+			case 3 -> gestionInsertarProducto();
+			case 4 -> gestionInsertarFactura();
+			case 5 -> gestionInsertarPedido();
+			case 0 -> System.out.println("Saliendo del programa...");
+		    default -> System.out.println("Opción no válida.");
 			}
 
 		} while (opc != 0);
@@ -88,8 +94,92 @@ public class Principal {
 			System.out.println("Opción no válida");
 		}
 	}
-	
+
 	public static void gestionInsentarMesa() {
+		int numComensales;
 		
+		System.out.println("----- INSERTAR MESA -----");
+		System.out.print("Número de comensales: ");
+		numComensales = sc.nextInt();
+		sc.nextLine();
+		
+		System.out.print("¿Tiene reserva? (1 = Sí, 0 = No): ");
+		int reserva = sc.nextInt();
+		sc.nextLine();
+
+		if (RestauranteCRUD.insertarMesa(numComensales, reserva)) {
+			System.out.println("Mesa insertada correctamente.");
+		} else {
+			System.out.println("Error al insertar mesa.");
+		}
 	}
+	
+	public static void gestionInsertarProducto() {
+		String nombre = "";
+		double precio;
+		
+		System.out.println("---- INSERTAR PRODUCTO -----");
+		System.out.println("Nombre del producto: ");
+		nombre = sc.nextLine();
+		
+		System.out.println("Precio del producto: ");
+		precio = sc.nextDouble();
+		sc.nextLine();
+		
+		if (RestauranteCRUD.insertarProducto(nombre, precio)) {
+			System.out.println("Producto insertado correctamente");
+		} else {
+			System.out.println("Error al insertar producto.");
+		}
+	}
+	
+	public static void gestionInsertarFactura() {
+		int idMesa;
+		String tipoPago = "";
+		double importe;
+		
+		System.out.println("----- INSERTAR FACTURA -----");
+		System.out.println("ID de mesa: ");
+		idMesa = sc.nextInt();
+		sc.nextLine();
+		
+		System.out.println("Tipo de pago: ");
+		tipoPago = sc.nextLine();
+		
+		System.out.println("Importe de factura: ");
+		importe = sc.nextDouble();
+		sc.nextLine();
+		
+		if (RestauranteCRUD.insertarFactura(idMesa, tipoPago, importe)) {
+			System.out.println("Factura insertada correctamente");
+		} else {
+			System.out.println("Error al insertar factura.");
+		}
+	}
+	
+	public static void gestionInsertarPedido() {
+		int idFactura;
+		int idProducto;
+		int cantidad;
+		
+		System.out.println("----- INSERTAR PEDIDO -----");
+		System.out.println("ID de Factura: ");
+		idFactura = sc.nextInt();
+		sc.nextLine();
+		
+		System.out.println("ID de Producto: ");
+		idProducto = sc.nextInt();
+		sc.nextLine();
+		
+		System.out.println("Cantidad de pedido: ");
+		cantidad = sc.nextInt();
+		sc.nextLine();
+		
+		if (RestauranteCRUD.insertarPedido(idFactura, idProducto, cantidad)) {
+			System.out.println("Pedido insertado correctamente");
+		} else {
+			System.out.println("Error al insertar pedido.");
+		}
+	}
+
 }

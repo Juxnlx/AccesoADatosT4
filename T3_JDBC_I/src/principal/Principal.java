@@ -1,8 +1,10 @@
 package principal;
 
+import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.Scanner;
 
+import conexion.Conexion;
 import crud.RestauranteCRUD;
 
 public class Principal {
@@ -32,6 +34,7 @@ public class Principal {
 			case 3 -> gestionInsertarProducto();
 			case 4 -> gestionInsertarFactura();
 			case 5 -> gestionInsertarPedido();
+			case 6 -> menuListar();
 			case 0 -> System.out.println("Saliendo del programa...");
 		    default -> System.out.println("Opción no válida.");
 			}
@@ -182,4 +185,173 @@ public class Principal {
 		}
 	}
 
+	public static void menuListar() {
+	    System.out.println("¿Qué tabla quieres listar?");
+	    System.out.println("1. Mesa");
+	    System.out.println("2. Producto");
+	    System.out.println("3. Factura");
+	    System.out.println("4. Pedido");
+	    System.out.print("Opción: ");
+
+	    int opcTabla = sc.nextInt();
+	    sc.nextLine(); // limpiar buffer
+
+	    String tabla = "";
+	    switch (opcTabla) {
+	        case 1 -> tabla = "Mesa";
+	        case 2 -> tabla = "Producto";
+	        case 3 -> tabla = "Factura";
+	        case 4 -> tabla = "Pedido";
+	        default -> { 
+	            System.out.println("Tabla no válida.");
+	            return;
+	        }
+	    }
+
+	    System.out.println("¿Quieres filtrar?");
+	    System.out.println("1. Sí");
+	    System.out.println("2. No");
+	    System.out.print("Opción: ");
+
+	    int opcFiltro = sc.nextInt();
+	    sc.nextLine();
+
+	    String campo = "";
+	    String operacion = "";
+	    String valor = "";
+
+	    if (opcFiltro == 1) {
+	        System.out.print("Campo por el que filtrar: ");
+	        campo = sc.nextLine();
+
+	        System.out.print("Operación (=, <, >, LIKE): ");
+	        operacion = sc.nextLine().toUpperCase();
+
+	        System.out.print("Valor: ");
+	        valor = sc.nextLine();
+	    }
+
+	    // Llamamos al CRUD
+	    String resultado = RestauranteCRUD.listar(tabla, campo, operacion, valor);
+
+	    // Mostrar resultados
+	    System.out.println("----- RESULTADO -----");
+	    System.out.println(resultado);
+	}
+	
+	public static void modificar() {
+
+	    System.out.println("Tabla:");
+	    String tabla = sc.nextLine();
+
+	    System.out.println("Campo filtro:");
+	    String campoFiltro = sc.nextLine();
+
+	    System.out.println("Valor del filtro:");
+	    String valorFiltro = sc.nextLine();
+
+	    System.out.println("Campo a modificar:");
+	    String campoModificar = sc.nextLine();
+
+	    System.out.println("Nuevo valor:");
+	    String nuevoValor = sc.nextLine();
+
+	    boolean modificado = RestauranteCRUD.modificar(tabla, campoFiltro, valorFiltro, campoModificar, nuevoValor);
+
+	    if (!modificado) {
+	        System.out.println("No se modificó ningún registro.");
+	        return;
+	    }
+
+	    System.out.println("¿Confirmar cambios? (s/n)");
+	    String resp = sc.nextLine();
+
+	    try (Connection con = Conexion.conexionBD()) {
+	        if (resp.equalsIgnoreCase("s")) {
+	            con.commit();
+	            System.out.println("Cambios guardados.");
+	        } else {
+	            con.rollback();
+	            System.out.println("Cambios deshechos.");
+	        }
+	    } catch (SQLException e) {
+	        e.printStackTrace();
+	    }
+	}
+
+
+	public static void borrarEnMain() {
+	    Scanner sc = new Scanner(System.in);
+
+	    System.out.println("¿Borrar todas las tablas o una en concreto? (todas/una): ");
+	    String opc = sc.nextLine();
+
+	    if (opc.equalsIgnoreCase("todas")) {
+	        // Pedir confirmación antes de dropear todo
+	        System.out.println("¡¡VAS A BORRAR TODAS LAS TABLAS!! ¿Seguro? (s/n)");
+	        String conf = sc.nextLine();
+
+	        if (!conf.equalsIgnoreCase("s")) {
+	            System.out.println("Operación cancelada.");
+	            return;
+	        }
+
+	        boolean ex = RestauranteCRUD.borrar("Mesa", "DROP", null, null);
+	        ex &= RestauranteCRUD.borrar("Producto", "DROP", null, null);
+	        ex &= RestauranteCRUD.borrar("Factura", "DROP", null, null);
+	        ex &= RestauranteCRUD.borrar("Pedido", "DROP", null, null);
+
+	        System.out.println("Tablas borradas (pendiente de confirmar).");
+
+	        confirmarCambios();  // commit o rollback
+	        return;
+	    }
+
+	    // Borrado de una tabla concreta
+	    System.out.println("Nombre de la tabla:");
+	    String tabla = sc.nextLine();
+
+	    System.out.println("¿Borrar la tabla completa (drop), todos los datos (all), o filtrar (filtro)?");
+	    String tipo = sc.nextLine();
+
+	    if (tipo.equalsIgnoreCase("drop")) {
+	        System.out.println("Vas a ELIMINAR la tabla completa " + tabla);
+	        System.out.println("¿Confirmar? (s/n)");
+	        if (!sc.nextLine().equalsIgnoreCase("s")) return;
+
+	        RestauranteCRUD.borrar(tabla, "DROP", null, null);
+	        confirmarCambios();
+	        return;
+	    }
+
+	    if (tipo.equalsIgnoreCase("all")) {
+	        // Listar antes:
+	        listarTabla(tabla);
+
+	        System.out.println("¿Borrar TODOS los registros? (s/n)");
+	        if (!sc.nextLine().equalsIgnoreCase("s")) return;
+
+	        RestauranteCRUD.borrar(tabla, "TABLA_COMPLETA", null, null);
+	        confirmarCambios();
+	        return;
+	    }
+
+	    // Borrar por filtro
+	    System.out.println("Campo del filtro:");
+	    String campo = sc.nextLine();
+
+	    System.out.println("Valor del filtro:");
+	    String valor = sc.nextLine();
+
+	    // Listar lo que se va a borrar
+	    listarConFiltro(tabla, campo, valor);
+
+	    System.out.println("¿Confirmar borrado? (s/n)");
+	    if (!sc.nextLine().equalsIgnoreCase("s")) return;
+
+	    RestauranteCRUD.borrar(tabla, "FILTRO", campo, valor);
+	    confirmarCambios();
+	}
+
+	
 }

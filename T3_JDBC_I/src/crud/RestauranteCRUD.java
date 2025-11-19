@@ -179,24 +179,23 @@ public class RestauranteCRUD {
 	}
 
 	public static boolean insertarFactura(int idMesa, String tipoPago, double importe) {
-	    String sql = "INSERT INTO Factura (idMesa, tipoPago, importe) VALUES (?, ?, ?)";
-	    boolean sol = false;
+		String sql = "INSERT INTO Factura (idMesa, tipoPago, importe) VALUES (?, ?, ?)";
+		boolean sol = false;
 
-	    try (Connection conn = Conexion.conexionBD(); PreparedStatement ps = conn.prepareStatement(sql)) {
-	        ps.setInt(1, idMesa);
-	        ps.setString(2, tipoPago);
-	        ps.setDouble(3, importe);
+		try (Connection conn = Conexion.conexionBD(); PreparedStatement ps = conn.prepareStatement(sql)) {
+			ps.setInt(1, idMesa);
+			ps.setString(2, tipoPago);
+			ps.setDouble(3, importe);
 
-	        ps.executeUpdate();
-	        sol = true;
-	        System.out.println("Factura insertada correctamente");
-	    } catch (SQLException e) {
-	        System.out.println("Error al insertar factura: " + e.getMessage());
-	    }
+			ps.executeUpdate();
+			sol = true;
+			System.out.println("Factura insertada correctamente");
+		} catch (SQLException e) {
+			System.out.println("Error al insertar factura: " + e.getMessage());
+		}
 
-	    return sol;
+		return sol;
 	}
-
 
 	public static boolean insertarPedido(int idFactura, int idProducto, int cantidad) {
 		String sql = "INSERT INTO Pedido (idFactura, idProducto, cantidad) VALUES (?, ?, ?)";
@@ -215,39 +214,151 @@ public class RestauranteCRUD {
 
 		return sol;
 	}
-	
-	public static ResultSet listar(String tabla, String campo, String operador, String valor) {
-	    ResultSet rs = null;
-	    Connection conn = null;
 
-	    try {
-	        conn = Conexion.conexionBD();
-	        String sql;
+	public static String listar(String tabla, String campo, String operacion, String valor) {
+		StringBuilder resultado = new StringBuilder();
+		String sql;
 
-	        // Si no hay filtro → mostrar toda la tabla
-	        if (campo == null || campo.isEmpty()) {
-	            sql = "SELECT * FROM " + tabla;
-	            PreparedStatement ps = conn.prepareStatement(sql);
-	            rs = ps.executeQuery();
-	        } else {
-	            sql = "SELECT * FROM " + tabla + " WHERE " + campo + " " + operador + " ?";
-	            PreparedStatement ps = conn.prepareStatement(sql);
+		// Si no hay filtro → listar todo
+		if (campo.equals("") || operacion.equals("") || valor.equals("")) {
+			sql = "SELECT * FROM " + tabla;
+		} else {
+			if (operacion.equalsIgnoreCase("LIKE")) {
+				sql = "SELECT * FROM " + tabla + " WHERE " + campo + " LIKE ?";
+				valor = "%" + valor + "%";
+			} else {
+				sql = "SELECT * FROM " + tabla + " WHERE " + campo + " " + operacion + " ?";
+			}
+		}
 
-	            if (operador.equalsIgnoreCase("LIKE")) {
-	                ps.setString(1, "%" + valor + "%");
-	            } else {
-	                ps.setString(1, valor);
-	            }
+		try (Connection conn = Conexion.conexionBD(); PreparedStatement ps = conn.prepareStatement(sql)) {
 
-	            rs = ps.executeQuery();
-	        }
+			// Si hay filtro → asignar valor
+			if (!campo.equals("") && !operacion.equals("") && !valor.equals("")) {
+				ps.setString(1, valor);
+			}
 
-	    } catch (SQLException e) {
-	        System.out.println("Error al listar datos de " + tabla + ": " + e.getMessage());
-	    }
+			ResultSet rs = ps.executeQuery();
 
-	    return rs;
+			// Obtener nombres de columnas automáticamente
+			int columnas = rs.getMetaData().getColumnCount();
+
+			while (rs.next()) {
+				for (int i = 1; i <= columnas; i++) {
+					resultado.append(rs.getMetaData().getColumnName(i)).append(": ").append(rs.getString(i))
+							.append("   ");
+				}
+				resultado.append("\n");
+			}
+
+		} catch (SQLException e) {
+			return "Error al listar: " + e.getMessage();
+		}
+
+		if (resultado.length() == 0) {
+			return "No hay resultados.";
+		}
+
+		return resultado.toString();
 	}
 
+	public static boolean modificar(String tabla, String campoFiltro, String valorFiltro, String campoModificar,
+			String nuevoValor) {
+
+		boolean exito = false;
+		Connection con = null;
+
+		try {
+			con = Conexion.conexionBD();
+
+			con.setAutoCommit(false); // Iniciar transacción
+
+			String sql = "UPDATE " + tabla + " SET " + campoModificar + " = ? WHERE " + campoFiltro + " = ?";
+			PreparedStatement ps = con.prepareStatement(sql);
+
+			ps.setString(1, nuevoValor);
+			ps.setString(2, valorFiltro);
+
+			int filas = ps.executeUpdate();
+
+			if (filas > 0) {
+				exito = true; // ha modificado algo
+			}
+
+			// No hacemos commit ni rollback aquí.
+			// Se hará en el MAIN según confirme el usuario.
+
+		} catch (SQLException e) {
+			try {
+				if (con != null) {
+					con.rollback(); // Deshacer cambios si hay error
+				}
+			} catch (SQLException e2) {
+			}
+		}
+
+		try {
+			if (con != null) {
+				con.setAutoCommit(true);
+				con.close();
+			}
+		} catch (SQLException e3) {
+		}
+
+		return exito; // ← único return
+	}
+
+	public static boolean borrar(String tabla, String tipoBorrado, String campoFiltro, String valorFiltro) {
+
+		boolean exito = false;
+		Connection con = null;
+
+		try {
+			con = Conexion.conexionBD();
+			con.setAutoCommit(false); // Iniciar transacción
+
+			String sql = "";
+
+			if (tipoBorrado.equalsIgnoreCase("DROP")) {
+				sql = "DROP TABLE IF EXISTS " + tabla;
+
+			} else if (tipoBorrado.equalsIgnoreCase("TABLA_COMPLETA")) {
+				sql = "DELETE FROM " + tabla;
+
+			} else if (tipoBorrado.equalsIgnoreCase("FILTRO")) {
+				sql = "DELETE FROM " + tabla + " WHERE " + campoFiltro + " = ?";
+			}
+
+			PreparedStatement ps = con.prepareStatement(sql);
+
+			if (tipoBorrado.equalsIgnoreCase("FILTRO")) {
+				ps.setString(1, valorFiltro);
+			}
+
+			int filas = ps.executeUpdate();
+			if (filas > 0 || tipoBorrado.equalsIgnoreCase("DROP")) {
+				exito = true;
+			}
+
+			// No commit ni rollback aquí → lo maneja el MAIN
+
+		} catch (SQLException e) {
+			try {
+				if (con != null)
+					con.rollback(); // por error
+			} catch (SQLException e2) {
+			}
+		}
+
+		try {
+			if (con != null) {
+				con.setAutoCommit(true);
+				con.close();
+			}
+		} catch (SQLException e3) {
+		}
+
+		return exito; // ← único return
+	}
 
 }

@@ -308,57 +308,70 @@ public class RestauranteCRUD {
 		return exito; // ← único return
 	}
 
-	public static boolean borrar(String tabla, String tipoBorrado, String campoFiltro, String valorFiltro) {
-
+	public boolean borrar(Connection con, String tabla, String campoFiltro, String valorFiltro, boolean borrarTodo) {
 		boolean exito = false;
-		Connection con = null;
 
 		try {
-			con = Conexion.conexionBD();
-			con.setAutoCommit(false); // Iniciar transacción
+			con.setAutoCommit(false); // inicia transacción
 
-			String sql = "";
+			String sql;
 
-			if (tipoBorrado.equalsIgnoreCase("DROP")) {
-				sql = "DROP TABLE IF EXISTS " + tabla;
-
-			} else if (tipoBorrado.equalsIgnoreCase("TABLA_COMPLETA")) {
+			if (borrarTodo) {
 				sql = "DELETE FROM " + tabla;
-
-			} else if (tipoBorrado.equalsIgnoreCase("FILTRO")) {
+			} else {
 				sql = "DELETE FROM " + tabla + " WHERE " + campoFiltro + " = ?";
 			}
 
 			PreparedStatement ps = con.prepareStatement(sql);
 
-			if (tipoBorrado.equalsIgnoreCase("FILTRO")) {
+			if (!borrarTodo) {
 				ps.setString(1, valorFiltro);
 			}
 
-			int filas = ps.executeUpdate();
-			if (filas > 0 || tipoBorrado.equalsIgnoreCase("DROP")) {
-				exito = true;
-			}
+			ps.executeUpdate();
 
-			// No commit ni rollback aquí → lo maneja el MAIN
+			exito = true;
 
 		} catch (SQLException e) {
-			try {
-				if (con != null)
-					con.rollback(); // por error
-			} catch (SQLException e2) {
-			}
+			exito = false;
 		}
+
+		return exito;
+	}
+
+	public boolean eliminarTabla(Connection con, String tabla, boolean eliminarTodo) {
+		boolean exito = false;
 
 		try {
-			if (con != null) {
-				con.setAutoCommit(true);
-				con.close();
+			con.setAutoCommit(false);
+
+			if (eliminarTodo) {
+				// Eliminamos todas las tablas (orden recomendado para evitar FK)
+				String[] tablas = { "Pedido", "Factura", "Producto", "Mesa" };
+				for (String t : tablas) {
+					try {
+						con.createStatement().executeUpdate("DROP TABLE IF EXISTS " + t);
+					} catch (SQLException e) {
+						// ignoramos si falla una tabla por FK
+					}
+				}
+				exito = true;
+			} else {
+				// Eliminamos solo la tabla indicada
+				String sql = "DROP TABLE " + tabla;
+				try {
+					con.createStatement().executeUpdate(sql);
+					exito = true;
+				} catch (SQLException e) {
+					exito = false; // no se puede eliminar por FK u otro motivo
+				}
 			}
-		} catch (SQLException e3) {
+
+		} catch (SQLException e) {
+			exito = false;
 		}
 
-		return exito; // ← único return
+		return exito;
 	}
 
 }

@@ -1,8 +1,13 @@
 package principal;
 
 import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.Scanner;
+
 
 import conexion.Conexion;
 import crud.RestauranteCRUD;
@@ -13,6 +18,10 @@ public class Principal {
 
 	public static void main(String[] args) {
 
+		Connection con = Conexion.conexionBD(); // Conexión abierta
+
+        RestauranteCRUD crud = new RestauranteCRUD(); // Instancia del CRUD
+		
 		// Creamos la variable opc como int para almacenar la opción seleccionada por el
 		// usuario.
 		int opc;
@@ -35,6 +44,9 @@ public class Principal {
 			case 4 -> gestionInsertarFactura();
 			case 5 -> gestionInsertarPedido();
 			case 6 -> menuListar();
+			case 7 -> modificar();
+			case 8 -> borrarDesdeMain(con, crud);
+			case 9 -> eliminarTablasDesdeMain(con, crud);
 			case 0 -> System.out.println("Saliendo del programa...");
 		    default -> System.out.println("Opción no válida.");
 			}
@@ -279,79 +291,121 @@ public class Principal {
 	    }
 	}
 
+	public static void listarTablaCompleta(Connection con, String tabla) {
 
-	public static void borrarEnMain() {
-	    Scanner sc = new Scanner(System.in);
+	    if (con == null) {
+	        System.out.println("ERROR: la conexión es null.");
+	        return;
+	    }
 
-	    System.out.println("¿Borrar todas las tablas o una en concreto? (todas/una): ");
-	    String opc = sc.nextLine();
+	    try {
+	        String sql = "SELECT * FROM " + tabla;
+	        Statement st = con.createStatement();
+	        ResultSet rs = st.executeQuery(sql);
 
-	    if (opc.equalsIgnoreCase("todas")) {
-	        // Pedir confirmación antes de dropear todo
-	        System.out.println("¡¡VAS A BORRAR TODAS LAS TABLAS!! ¿Seguro? (s/n)");
-	        String conf = sc.nextLine();
+	        while (rs.next()) {
+	            int cols = rs.getMetaData().getColumnCount();
 
-	        if (!conf.equalsIgnoreCase("s")) {
-	            System.out.println("Operación cancelada.");
-	            return;
+	            for (int i = 1; i <= cols; i++) {
+	                System.out.print(rs.getMetaData().getColumnName(i) + ": " + rs.getString(i) + "  ");
+	            }
+	            System.out.println();
 	        }
 
-	        boolean ex = RestauranteCRUD.borrar("Mesa", "DROP", null, null);
-	        ex &= RestauranteCRUD.borrar("Producto", "DROP", null, null);
-	        ex &= RestauranteCRUD.borrar("Factura", "DROP", null, null);
-	        ex &= RestauranteCRUD.borrar("Pedido", "DROP", null, null);
-
-	        System.out.println("Tablas borradas (pendiente de confirmar).");
-
-	        confirmarCambios();  // commit o rollback
-	        return;
+	    } catch (SQLException e) {
+	        System.out.println("Error al listar tabla completa: " + e.getMessage());
 	    }
-
-	    // Borrado de una tabla concreta
-	    System.out.println("Nombre de la tabla:");
-	    String tabla = sc.nextLine();
-
-	    System.out.println("¿Borrar la tabla completa (drop), todos los datos (all), o filtrar (filtro)?");
-	    String tipo = sc.nextLine();
-
-	    if (tipo.equalsIgnoreCase("drop")) {
-	        System.out.println("Vas a ELIMINAR la tabla completa " + tabla);
-	        System.out.println("¿Confirmar? (s/n)");
-	        if (!sc.nextLine().equalsIgnoreCase("s")) return;
-
-	        RestauranteCRUD.borrar(tabla, "DROP", null, null);
-	        confirmarCambios();
-	        return;
-	    }
-
-	    if (tipo.equalsIgnoreCase("all")) {
-	        // Listar antes:
-	        listarTabla(tabla);
-
-	        System.out.println("¿Borrar TODOS los registros? (s/n)");
-	        if (!sc.nextLine().equalsIgnoreCase("s")) return;
-
-	        RestauranteCRUD.borrar(tabla, "TABLA_COMPLETA", null, null);
-	        confirmarCambios();
-	        return;
-	    }
-
-	    // Borrar por filtro
-	    System.out.println("Campo del filtro:");
-	    String campo = sc.nextLine();
-
-	    System.out.println("Valor del filtro:");
-	    String valor = sc.nextLine();
-
-	    // Listar lo que se va a borrar
-	    listarConFiltro(tabla, campo, valor);
-
-	    System.out.println("¿Confirmar borrado? (s/n)");
-	    if (!sc.nextLine().equalsIgnoreCase("s")) return;
-
-	    RestauranteCRUD.borrar(tabla, "FILTRO", campo, valor);
-	    confirmarCambios();
 	}
 
+
 	
+	public static void borrarDesdeMain(Connection con, RestauranteCRUD crud) {
+
+	    System.out.println("¿Qué tabla quieres borrar?");
+	    String tabla = sc.nextLine();
+
+	    System.out.println("¿Quieres borrar toda la tabla? (s/n)");
+	    boolean borrarTodo = sc.nextLine().equalsIgnoreCase("s");
+
+	    String campo = "";
+	    String valor = "";
+
+	    if (!borrarTodo) {
+	        System.out.println("Introduce el campo por el que borrar:");
+	        campo = sc.nextLine();
+
+	        System.out.println("Introduce el valor que debe tener:");
+	        valor = sc.nextLine();
+	    }
+
+	    boolean exito = crud.borrar(con, tabla, campo, valor, borrarTodo);
+
+	    if (!exito) {
+	        System.out.println("No se pudo borrar. Revisa claves foráneas.");
+	        try { con.rollback(); } catch (SQLException e) {}
+	        return;
+	    }
+
+	    System.out.println("Datos tras el borrado:");
+	    listarTabla(con, tabla);
+
+	    System.out.println("¿Confirmar cambios? (s/n)");
+	    if (sc.nextLine().equalsIgnoreCase("s")) {
+	        try { con.commit(); System.out.println("Cambios guardados."); } catch (SQLException e) {}
+	    } else {
+	        try { con.rollback(); System.out.println("Cambios deshechos."); } catch (SQLException e) {}
+	    }
+	}
+	
+	public static void listarTabla(Connection con, String tabla) {
+	    try {
+	        String sql = "SELECT * FROM " + tabla;
+	        PreparedStatement ps = con.prepareStatement(sql);
+	        ResultSet rs = ps.executeQuery();
+
+	        ResultSetMetaData meta = rs.getMetaData();
+	        int columnas = meta.getColumnCount();
+
+	        while (rs.next()) {
+	            for (int i = 1; i <= columnas; i++) {
+	                System.out.print(meta.getColumnName(i) + ": " + rs.getString(i) + "  ");
+	            }
+	            System.out.println();
+	        }
+
+	    } catch (SQLException e) {
+	        System.out.println("Error al listar.");
+	    }
+	}
+
+	public static void eliminarTablasDesdeMain(Connection con, RestauranteCRUD crud) {
+	    System.out.println("¿Quieres eliminar todas las tablas? (s/n)");
+	    boolean eliminarTodo = sc.nextLine().equalsIgnoreCase("s");
+
+	    String tabla = "";
+	    if (!eliminarTodo) {
+	        System.out.println("Introduce el nombre de la tabla a eliminar:");
+	        tabla = sc.nextLine();
+	    }
+
+	    boolean exito = crud.eliminarTabla(con, tabla, eliminarTodo);
+
+	    if (!exito) {
+	        System.out.println("No se pudo eliminar la tabla. Puede haber restricciones de integridad.");
+	        try { con.rollback(); } catch (SQLException e) {}
+	        return;
+	    }
+
+	    System.out.println("Tabla(s) eliminada(s) correctamente.");
+
+	    // Confirmar cambios
+	    System.out.println("¿Confirmar cambios? (s/n)");
+	    if (sc.nextLine().equalsIgnoreCase("s")) {
+	        try { con.commit(); System.out.println("Cambios guardados."); } catch (SQLException e) {}
+	    } else {
+	        try { con.rollback(); System.out.println("Cambios deshechos."); } catch (SQLException e) {}
+	    }
+	}
+
+
 }

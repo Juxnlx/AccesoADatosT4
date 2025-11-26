@@ -14,7 +14,6 @@ public class RestauranteCRUD {
 	/**
 	 * Creamos todas las tablas necesarias para el funcionamiento del sistema de
 	 * restaurante.
-	 * 
 	 */
 	public static void crearTodasLasTablas() {
 		// Utilizamos try-catch para abrir la conexión y el Statement.
@@ -54,9 +53,8 @@ public class RestauranteCRUD {
 	/**
 	 * Comprueba si una tabla existe en la base de datos.
 	 * 
-	 * @param nombreTabla ombre de la tabla que queremos comprobar.
-	 * @return true, si la tabla existe en la base de datos, false en caso
-	 *         contrario.
+	 * @param nombreTabla nombre de la tabla que queremos comprobar.
+	 * @return true si la tabla existe en la base de datos, false en caso contrario.
 	 */
 	public static boolean existenciaTabla(String nombreTabla) {
 		// Variable para almacenar si la tabla existe o no.
@@ -93,10 +91,8 @@ public class RestauranteCRUD {
 	 * @param nombreTabla el nombre de la tabla que se quiere comprobar.
 	 * @return true si se cumplen las condiciones para crear la tabla, false en caso
 	 *         contrario.
-	 * @throws SQLException si ocurre un error al comprobar la existencia de alguna
-	 *                      tabla.
 	 */
-	public static boolean puedeCrearTabla(String nombreTabla) throws SQLException {
+	public static boolean puedeCrearTabla(String nombreTabla) {
 
 		// Convertimos el nombre a minúsculas.
 		nombreTabla = nombreTabla.toLowerCase();
@@ -108,16 +104,24 @@ public class RestauranteCRUD {
 		switch (nombreTabla) {
 
 		// Mesa y Producto no dependen de ninguna otra tabla.
-		case "mesa", "producto" -> sol = true;
+		case "mesa":
+		case "producto":
+			sol = true;
+			break;
 
 		// Factura solo se puede crear si la tabla Mesa existe.
-		case "factura" -> sol = existenciaTabla("Mesa");
+		case "factura":
+			sol = existenciaTabla("Mesa");
+			break;
 
 		// Pedido depende de Factura y Producto.
-		case "pedido" -> sol = existenciaTabla("Factura") && existenciaTabla("Producto");
+		case "pedido":
+			sol = existenciaTabla("Factura") && existenciaTabla("Producto");
+			break;
 
 		// Cualquier otro nombre de tabla no se reconoce: no se crea.
-		default -> sol = false;
+		default:
+			sol = false;
 		}
 
 		// Devolvemos el resultado final.
@@ -189,7 +193,6 @@ public class RestauranteCRUD {
 				""";
 	}
 
-	
 	/**
 	 * Inserta un registro en la tabla Mesa.
 	 *
@@ -309,74 +312,434 @@ public class RestauranteCRUD {
 	}
 
 	/**
-	 * Lista registros de una tabla con la posibilidad de aplicar un filtro.
+	 * Lista todos los registros de la tabla Mesa.
 	 *
-	 * @param tabla     nombre de la tabla a consultar.
-	 * @param campo     nombre del campo sobre el que se aplicará el filtro
-	 *                  (opcional).
-	 * @param operacion operación de comparación (ej: "=", "<", ">", "LIKE")
-	 *                  (opcional).
-	 * @param valor     valor a comparar en la operación (opcional).
-	 * @return una cadena con los registros encontrados, mostrando el nombre de cada
-	 *         columna y su valor, o un mensaje si no hay resultados o ocurre un
-	 *         error.
+	 * @return cadena con todos los registros de Mesa o mensaje de error.
 	 */
-	public static String listar(String tabla, String campo, String operacion, String valor) {
-
-		// StringBuilder para acumular los resultados de la consulta.
+	public static String listarMesa() {
 		StringBuilder resultado = new StringBuilder();
-		String sql;
+		String sql = "SELECT * FROM Mesa";
 
-		// Determinar si se aplicará un filtro o se listará toda la tabla.
-		if (campo.equals("") || operacion.equals("") || valor.equals("")) {
-			// Sin filtro: lista todos los registros.
-			sql = "SELECT * FROM " + tabla;
-		} else {
-			// Con filtro
-			if (operacion.equalsIgnoreCase("LIKE")) {
-				// Para LIKE, agregamos comodines % al valor.
-				sql = "SELECT * FROM " + tabla + " WHERE " + campo + " LIKE ?";
-				valor = "%" + valor + "%";
-			} else {
-				// Operaciones normales (=, <, >, etc.)
-				sql = "SELECT * FROM " + tabla + " WHERE " + campo + " " + operacion + " ?";
-			}
-		}
+		try (Connection conn = Conexion.conexionBD();
+				PreparedStatement ps = conn.prepareStatement(sql);
+				ResultSet rs = ps.executeQuery()) {
 
-		// Abrimos conexión y preparamos el statement.
-		try (Connection conn = Conexion.conexionBD(); PreparedStatement ps = conn.prepareStatement(sql)) {
-
-			// Asignar valor al parámetro si hay filtro.
-			if (!campo.equals("") && !operacion.equals("") && !valor.equals("")) {
-				ps.setString(1, valor);
-			}
-
-			// Ejecutamos la consulta.
-			ResultSet rs = ps.executeQuery();
-
-			// Obtenemos automáticamente el número de columnas para recorrerlas.
-			int columnas = rs.getMetaData().getColumnCount();
-
-			// Recorrer todos los resultados y concatenarlos al StringBuilder.
 			while (rs.next()) {
-				for (int i = 1; i <= columnas; i++) {
-					resultado.append(rs.getMetaData().getColumnName(i)).append(": ").append(rs.getString(i))
-							.append("   "); // separador entre columnas
-				}
-				resultado.append("\n"); // salto de línea entre registros
+				resultado.append("ID: ").append(rs.getInt("idMesa"));
+				resultado.append(" | Comensales: ").append(rs.getInt("numComensales"));
+				resultado.append(" | Reserva: ").append(rs.getInt("reserva"));
+				resultado.append("\n");
 			}
 
 		} catch (SQLException e) {
-			// En caso de error, devolvemos el mensaje directamente.
-			return "Error al listar: " + e.getMessage();
+			return "Error al listar mesas: " + e.getMessage();
 		}
 
-		// Si no hay resultados, devolvemos un mensaje.
 		if (resultado.length() == 0) {
-			return "No hay resultados.";
+			return "No hay mesas registradas.";
 		}
 
-		// Devolvemos todos los registros encontrados.
+		return resultado.toString();
+	}
+
+	/**
+	 * Lista registros de la tabla Mesa filtrando por número de comensales.
+	 *
+	 * @param numComensales número de comensales a buscar.
+	 * @return cadena con los registros encontrados o mensaje si no hay resultados.
+	 */
+	public static String listarMesaPorComensales(int numComensales) {
+		StringBuilder resultado = new StringBuilder();
+		String sql = "SELECT * FROM Mesa WHERE numComensales = ?";
+
+		try (Connection conn = Conexion.conexionBD(); PreparedStatement ps = conn.prepareStatement(sql)) {
+
+			ps.setInt(1, numComensales);
+			ResultSet rs = ps.executeQuery();
+
+			while (rs.next()) {
+				resultado.append("ID: ").append(rs.getInt("idMesa"));
+				resultado.append(" | Comensales: ").append(rs.getInt("numComensales"));
+				resultado.append(" | Reserva: ").append(rs.getInt("reserva"));
+				resultado.append("\n");
+			}
+
+		} catch (SQLException e) {
+			return "Error al listar mesas: " + e.getMessage();
+		}
+
+		if (resultado.length() == 0) {
+			return "No hay mesas con " + numComensales + " comensales.";
+		}
+
+		return resultado.toString();
+	}
+
+	/**
+	 * Lista registros de la tabla Mesa filtrando por estado de reserva.
+	 *
+	 * @param reserva estado de reserva (1 reservada, 0 libre).
+	 * @return cadena con los registros encontrados o mensaje si no hay resultados.
+	 */
+	public static String listarMesaPorReserva(int reserva) {
+		StringBuilder resultado = new StringBuilder();
+		String sql = "SELECT * FROM Mesa WHERE reserva = ?";
+
+		try (Connection conn = Conexion.conexionBD(); PreparedStatement ps = conn.prepareStatement(sql)) {
+
+			ps.setInt(1, reserva);
+			ResultSet rs = ps.executeQuery();
+
+			while (rs.next()) {
+				resultado.append("ID: ").append(rs.getInt("idMesa"));
+				resultado.append(" | Comensales: ").append(rs.getInt("numComensales"));
+				resultado.append(" | Reserva: ").append(rs.getInt("reserva"));
+				resultado.append("\n");
+			}
+
+		} catch (SQLException e) {
+			return "Error al listar mesas: " + e.getMessage();
+		}
+
+		if (resultado.length() == 0) {
+			return "No hay mesas con ese estado de reserva.";
+		}
+
+		return resultado.toString();
+	}
+
+	/**
+	 * Lista todos los registros de la tabla Producto.
+	 *
+	 * @return cadena con todos los productos o mensaje de error.
+	 */
+	public static String listarProducto() {
+		StringBuilder resultado = new StringBuilder();
+		String sql = "SELECT * FROM Producto";
+
+		try (Connection conn = Conexion.conexionBD();
+				PreparedStatement ps = conn.prepareStatement(sql);
+				ResultSet rs = ps.executeQuery()) {
+
+			while (rs.next()) {
+				resultado.append("ID: ").append(rs.getInt("idProducto"));
+				resultado.append(" | Nombre: ").append(rs.getString("nombre"));
+				resultado.append(" | Precio: ").append(rs.getDouble("precio"));
+				resultado.append("\n");
+			}
+
+		} catch (SQLException e) {
+			return "Error al listar productos: " + e.getMessage();
+		}
+
+		if (resultado.length() == 0) {
+			return "No hay productos registrados.";
+		}
+
+		return resultado.toString();
+	}
+
+	/**
+	 * Lista registros de la tabla Producto filtrando por nombre (búsqueda parcial).
+	 *
+	 * @param nombre nombre o parte del nombre del producto a buscar.
+	 * @return cadena con los registros encontrados o mensaje si no hay resultados.
+	 */
+	public static String listarProductoPorNombre(String nombre) {
+		StringBuilder resultado = new StringBuilder();
+		String sql = "SELECT * FROM Producto WHERE nombre LIKE ?";
+
+		try (Connection conn = Conexion.conexionBD(); PreparedStatement ps = conn.prepareStatement(sql)) {
+
+			ps.setString(1, "%" + nombre + "%");
+			ResultSet rs = ps.executeQuery();
+
+			while (rs.next()) {
+				resultado.append("ID: ").append(rs.getInt("idProducto"));
+				resultado.append(" | Nombre: ").append(rs.getString("nombre"));
+				resultado.append(" | Precio: ").append(rs.getDouble("precio"));
+				resultado.append("\n");
+			}
+
+		} catch (SQLException e) {
+			return "Error al listar productos: " + e.getMessage();
+		}
+
+		if (resultado.length() == 0) {
+			return "No hay productos con ese nombre.";
+		}
+
+		return resultado.toString();
+	}
+
+	/**
+	 * Lista registros de la tabla Producto filtrando por precio menor que el
+	 * indicado.
+	 *
+	 * @param precio precio máximo.
+	 * @return cadena con los registros encontrados o mensaje si no hay resultados.
+	 */
+	public static String listarProductoPorPrecioMenor(double precio) {
+		StringBuilder resultado = new StringBuilder();
+		String sql = "SELECT * FROM Producto WHERE precio < ?";
+
+		try (Connection conn = Conexion.conexionBD(); PreparedStatement ps = conn.prepareStatement(sql)) {
+
+			ps.setDouble(1, precio);
+			ResultSet rs = ps.executeQuery();
+
+			while (rs.next()) {
+				resultado.append("ID: ").append(rs.getInt("idProducto"));
+				resultado.append(" | Nombre: ").append(rs.getString("nombre"));
+				resultado.append(" | Precio: ").append(rs.getDouble("precio"));
+				resultado.append("\n");
+			}
+
+		} catch (SQLException e) {
+			return "Error al listar productos: " + e.getMessage();
+		}
+
+		if (resultado.length() == 0) {
+			return "No hay productos con precio menor a " + precio;
+		}
+
+		return resultado.toString();
+	}
+
+	/**
+	 * Lista registros de la tabla Producto filtrando por precio mayor que el
+	 * indicado.
+	 *
+	 * @param precio precio mínimo.
+	 * @return cadena con los registros encontrados o mensaje si no hay resultados.
+	 */
+	public static String listarProductoPorPrecioMayor(double precio) {
+		StringBuilder resultado = new StringBuilder();
+		String sql = "SELECT * FROM Producto WHERE precio > ?";
+
+		try (Connection conn = Conexion.conexionBD(); PreparedStatement ps = conn.prepareStatement(sql)) {
+
+			ps.setDouble(1, precio);
+			ResultSet rs = ps.executeQuery();
+
+			while (rs.next()) {
+				resultado.append("ID: ").append(rs.getInt("idProducto"));
+				resultado.append(" | Nombre: ").append(rs.getString("nombre"));
+				resultado.append(" | Precio: ").append(rs.getDouble("precio"));
+				resultado.append("\n");
+			}
+
+		} catch (SQLException e) {
+			return "Error al listar productos: " + e.getMessage();
+		}
+
+		if (resultado.length() == 0) {
+			return "No hay productos con precio mayor a " + precio;
+		}
+
+		return resultado.toString();
+	}
+
+	/**
+	 * Lista todos los registros de la tabla Factura.
+	 *
+	 * @return cadena con todas las facturas o mensaje de error.
+	 */
+	public static String listarFactura() {
+		StringBuilder resultado = new StringBuilder();
+		String sql = "SELECT * FROM Factura";
+
+		try (Connection conn = Conexion.conexionBD();
+				PreparedStatement ps = conn.prepareStatement(sql);
+				ResultSet rs = ps.executeQuery()) {
+
+			while (rs.next()) {
+				resultado.append("ID: ").append(rs.getInt("idFactura"));
+				resultado.append(" | Mesa: ").append(rs.getInt("idMesa"));
+				resultado.append(" | Tipo Pago: ").append(rs.getString("tipoPago"));
+				resultado.append(" | Importe: ").append(rs.getDouble("importe"));
+				resultado.append("\n");
+			}
+
+		} catch (SQLException e) {
+			return "Error al listar facturas: " + e.getMessage();
+		}
+
+		if (resultado.length() == 0) {
+			return "No hay facturas registradas.";
+		}
+
+		return resultado.toString();
+	}
+
+	/**
+	 * Lista registros de la tabla Factura filtrando por tipo de pago.
+	 *
+	 * @param tipoPago tipo de pago a buscar (Efectivo, Tarjeta, etc.).
+	 * @return cadena con los registros encontrados o mensaje si no hay resultados.
+	 */
+	public static String listarFacturaPorTipoPago(String tipoPago) {
+		StringBuilder resultado = new StringBuilder();
+		String sql = "SELECT * FROM Factura WHERE tipoPago = ?";
+
+		try (Connection conn = Conexion.conexionBD(); PreparedStatement ps = conn.prepareStatement(sql)) {
+
+			ps.setString(1, tipoPago);
+			ResultSet rs = ps.executeQuery();
+
+			while (rs.next()) {
+				resultado.append("ID: ").append(rs.getInt("idFactura"));
+				resultado.append(" | Mesa: ").append(rs.getInt("idMesa"));
+				resultado.append(" | Tipo Pago: ").append(rs.getString("tipoPago"));
+				resultado.append(" | Importe: ").append(rs.getDouble("importe"));
+				resultado.append("\n");
+			}
+
+		} catch (SQLException e) {
+			return "Error al listar facturas: " + e.getMessage();
+		}
+
+		if (resultado.length() == 0) {
+			return "No hay facturas con ese tipo de pago.";
+		}
+
+		return resultado.toString();
+	}
+
+	/**
+	 * Lista registros de la tabla Factura filtrando por importe menor que el
+	 * indicado.
+	 *
+	 * @param importe importe máximo.
+	 * @return cadena con los registros encontrados o mensaje si no hay resultados.
+	 */
+	public static String listarFacturaPorImporteMenor(double importe) {
+		StringBuilder resultado = new StringBuilder();
+		String sql = "SELECT * FROM Factura WHERE importe < ?";
+
+		try (Connection conn = Conexion.conexionBD(); PreparedStatement ps = conn.prepareStatement(sql)) {
+
+			ps.setDouble(1, importe);
+			ResultSet rs = ps.executeQuery();
+
+			while (rs.next()) {
+				resultado.append("ID: ").append(rs.getInt("idFactura"));
+				resultado.append(" | Mesa: ").append(rs.getInt("idMesa"));
+				resultado.append(" | Tipo Pago: ").append(rs.getString("tipoPago"));
+				resultado.append(" | Importe: ").append(rs.getDouble("importe"));
+				resultado.append("\n");
+			}
+
+		} catch (SQLException e) {
+			return "Error al listar facturas: " + e.getMessage();
+		}
+
+		if (resultado.length() == 0) {
+			return "No hay facturas con importe menor a " + importe;
+		}
+
+		return resultado.toString();
+	}
+
+	/**
+	 * Lista registros de la tabla Factura filtrando por importe mayor que el
+	 * indicado.
+	 *
+	 * @param importe importe mínimo.
+	 * @return cadena con los registros encontrados o mensaje si no hay resultados.
+	 */
+	public static String listarFacturaPorImporteMayor(double importe) {
+		StringBuilder resultado = new StringBuilder();
+		String sql = "SELECT * FROM Factura WHERE importe > ?";
+
+		try (Connection conn = Conexion.conexionBD(); PreparedStatement ps = conn.prepareStatement(sql)) {
+
+			ps.setDouble(1, importe);
+			ResultSet rs = ps.executeQuery();
+
+			while (rs.next()) {
+				resultado.append("ID: ").append(rs.getInt("idFactura"));
+				resultado.append(" | Mesa: ").append(rs.getInt("idMesa"));
+				resultado.append(" | Tipo Pago: ").append(rs.getString("tipoPago"));
+				resultado.append(" | Importe: ").append(rs.getDouble("importe"));
+				resultado.append("\n");
+			}
+
+		} catch (SQLException e) {
+			return "Error al listar facturas: " + e.getMessage();
+		}
+
+		if (resultado.length() == 0) {
+			return "No hay facturas con importe mayor a " + importe;
+		}
+
+		return resultado.toString();
+	}
+
+	/**
+	 * Lista todos los registros de la tabla Pedido.
+	 *
+	 * @return cadena con todos los pedidos o mensaje de error.
+	 */
+	public static String listarPedido() {
+		StringBuilder resultado = new StringBuilder();
+		String sql = "SELECT * FROM Pedido";
+
+		try (Connection conn = Conexion.conexionBD();
+				PreparedStatement ps = conn.prepareStatement(sql);
+				ResultSet rs = ps.executeQuery()) {
+
+			while (rs.next()) {
+				resultado.append("ID: ").append(rs.getInt("idPedido"));
+				resultado.append(" | Factura: ").append(rs.getInt("idFactura"));
+				resultado.append(" | Producto: ").append(rs.getInt("idProducto"));
+				resultado.append(" | Cantidad: ").append(rs.getInt("cantidad"));
+				resultado.append("\n");
+			}
+
+		} catch (SQLException e) {
+			return "Error al listar pedidos: " + e.getMessage();
+		}
+
+		if (resultado.length() == 0) {
+			return "No hay pedidos registrados.";
+		}
+
+		return resultado.toString();
+	}
+
+	/**
+	 * Lista registros de la tabla Pedido filtrando por cantidad igual a la
+	 * indicada.
+	 *
+	 * @param cantidad cantidad exacta a buscar.
+	 * @return cadena con los registros encontrados o mensaje si no hay resultados.
+	 */
+	public static String listarPedidoPorCantidad(int cantidad) {
+		StringBuilder resultado = new StringBuilder();
+		String sql = "SELECT * FROM Pedido WHERE cantidad = ?";
+
+		try (Connection conn = Conexion.conexionBD(); PreparedStatement ps = conn.prepareStatement(sql)) {
+
+			ps.setInt(1, cantidad);
+			ResultSet rs = ps.executeQuery();
+
+			while (rs.next()) {
+				resultado.append("ID: ").append(rs.getInt("idPedido"));
+				resultado.append(" | Factura: ").append(rs.getInt("idFactura"));
+				resultado.append(" | Producto: ").append(rs.getInt("idProducto"));
+				resultado.append(" | Cantidad: ").append(rs.getInt("cantidad"));
+				resultado.append("\n");
+			}
+
+		} catch (SQLException e) {
+			return "Error al listar pedidos: " + e.getMessage();
+		}
+
+		if (resultado.length() == 0) {
+			return "No hay pedidos con esa cantidad.";
+		}
+
 		return resultado.toString();
 	}
 
@@ -385,6 +748,7 @@ public class RestauranteCRUD {
 	 * actualiza el valor de un campo según un filtro dado, usando una transacción
 	 * para que los cambios puedan confirmarse o deshacerse posteriormente.
 	 *
+	 * @param con            conexión a la base de datos.
 	 * @param tabla          nombre de la tabla donde se realizará la modificación.
 	 * @param campoFiltro    nombre del campo que se utilizará para localizar el
 	 *                       registro.
@@ -394,23 +758,17 @@ public class RestauranteCRUD {
 	 * @param nuevoValor     nuevo valor que se asignará al campoModificar.
 	 * @return true si al menos un registro fue modificado, false en caso contrario.
 	 */
-	public static boolean modificar(String tabla, String campoFiltro, String valorFiltro, String campoModificar,
-			String nuevoValor) {
+	public static boolean modificar(Connection con, String tabla, String campoFiltro, String valorFiltro,
+			String campoModificar, String nuevoValor) {
 
 		// Variable que indica si la modificación tuvo éxito.
 		boolean exito = false;
 
-		// Inicializamos la conexión en null para poder gestionarla en try/catch.
-		Connection con = null;
-
 		try {
-			// Abrimos la conexión a la base de datos.
-			con = Conexion.conexionBD();
-
 			// Desactivamos el autocommit para manejar la transacción manualmente.
 			con.setAutoCommit(false);
 
-			// Construimos la sentencia SQL dinámica para modificar el registro.
+			// Construimos la sentencia SQL para modificar el registro.
 			String sql = "UPDATE " + tabla + " SET " + campoModificar + " = ? WHERE " + campoFiltro + " = ?";
 			PreparedStatement ps = con.prepareStatement(sql);
 
@@ -427,24 +785,7 @@ public class RestauranteCRUD {
 			}
 
 		} catch (SQLException e) {
-			try {
-				// Si ocurre algún error, revertimos los cambios de la transacción.
-				if (con != null) {
-					con.rollback();
-				}
-			} catch (SQLException e2) {
-				// Ignoramos errores de rollback.
-			}
-		}
-
-		try {
-			// Restauramos el autocommit y cerramos la conexión.
-			if (con != null) {
-				con.setAutoCommit(true);
-				con.close();
-			}
-		} catch (SQLException e3) {
-			// Ignoramos errores al cerrar la conexión.
+			System.out.println("Error al modificar: " + e.getMessage());
 		}
 
 		// Devolvemos true si se modificó algún registro, false en caso contrario.
@@ -467,7 +808,8 @@ public class RestauranteCRUD {
 	 * @return true si la operación se ejecutó correctamente, false en caso de
 	 *         error.
 	 */
-	public boolean borrar(Connection con, String tabla, String campoFiltro, String valorFiltro, boolean borrarTodo) {
+	public static boolean borrar(Connection con, String tabla, String campoFiltro, String valorFiltro,
+			boolean borrarTodo) {
 
 		// Variable que indica si la operación fue exitosa.
 		boolean exito = false;
@@ -501,8 +843,7 @@ public class RestauranteCRUD {
 			exito = true;
 
 		} catch (SQLException e) {
-			// En caso de error, exito queda como false.
-			exito = false;
+			System.out.println("Error al borrar: " + e.getMessage());
 		}
 
 		// Devolvemos true si la eliminación fue correcta, false si hubo error.
@@ -521,7 +862,7 @@ public class RestauranteCRUD {
 	 * @return true si la operación se ejecutó correctamente, false si ocurrió algún
 	 *         error.
 	 */
-	public boolean eliminarTabla(Connection con, String tabla, boolean eliminarTodo) {
+	public static boolean eliminarTabla(Connection con, String tabla, boolean eliminarTodo) {
 
 		// Variable que indica si la operación fue exitosa.
 		boolean exito = false;
@@ -531,14 +872,13 @@ public class RestauranteCRUD {
 			con.setAutoCommit(false);
 
 			if (eliminarTodo) {
-				// Eliminamos todas las tablas en un orden recomendado para evitar errores de
-				// FK.
+				// Eliminamos todas las tablas en orden para evitar errores de FK.
 				String[] tablas = { "Pedido", "Factura", "Producto", "Mesa" };
 				for (String t : tablas) {
 					try {
 						con.createStatement().executeUpdate("DROP TABLE IF EXISTS " + t);
 					} catch (SQLException e) {
-						// Ignoramos errores de eliminación por FK, continuamos con las demás.
+						// Ignoramos errores individuales, continuamos con las demás.
 					}
 				}
 				exito = true;
@@ -550,14 +890,13 @@ public class RestauranteCRUD {
 					con.createStatement().executeUpdate(sql);
 					exito = true;
 				} catch (SQLException e) {
-					// Si no se puede eliminar (por FK u otro motivo), exito queda como false.
-					exito = false;
+					System.out.println(
+							"No se puede eliminar la tabla " + tabla + ". Puede tener relaciones con otras tablas.");
 				}
 			}
 
 		} catch (SQLException e) {
-			// Cualquier otro error en la transacción marca la operación como fallida.
-			exito = false;
+			System.out.println("Error al eliminar tablas: " + e.getMessage());
 		}
 
 		// Devolvemos true si se eliminó correctamente, false si hubo algún error.

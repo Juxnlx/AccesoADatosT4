@@ -2,7 +2,6 @@ package crud;
 
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
-import java.sql.Date;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -190,49 +189,7 @@ public class RestauranteCRUD {
 				""";
 	}
 
-	/**
-	 * Obtiene el ID de un registro de una tabla buscando por un campo específico.
-	 *
-	 * @param tabla nombre de la tabla de la cual se quiere obtener el ID.
-	 * @param campo nombre del campo por el que se realizará la búsqueda.
-	 * @param valor valor que debe coincidir en el campo especificado.
-	 * @return el ID encontrado si existe, o -1 si no se encuentra ningún registro o
-	 *         si ocurre un error.
-	 */
-	public static int obtenerIdPorCampo(String tabla, String campo, Object valor) {
-		// Valor por defecto en caso de que no se localice el registro.
-		int id = -1;
-
-		String sql = "SELECT * FROM " + tabla + " WHERE " + campo + " = ?";
-
-		try (Connection conn = Conexion.conexionBD(); PreparedStatement ps = conn.prepareStatement(sql)) {
-
-			// Asignamos el valor al parámetro según su tipo.
-			if (valor instanceof String)
-				ps.setString(1, (String) valor);
-			else if (valor instanceof Integer)
-				ps.setInt(1, (Integer) valor);
-			else if (valor instanceof Double)
-				ps.setDouble(1, (Double) valor);
-			else if (valor instanceof Date)
-				ps.setDate(1, (Date) valor);
-
-			// Ejecutamos la consulta.
-			ResultSet rs = ps.executeQuery();
-
-			// Si existe un registro, obtenemos el ID.
-			if (rs.next()) {
-				String idCol = "id" + tabla;
-				id = rs.getInt(idCol);
-			}
-		} catch (SQLException e) {
-			System.out.println("Error al obtener ID de " + tabla + ": " + e.getMessage());
-		}
-
-		// Devolvemos el ID encontrado, o -1 si no existía o hubo error.
-		return id;
-	}
-
+	
 	/**
 	 * Inserta un registro en la tabla Mesa.
 	 *
